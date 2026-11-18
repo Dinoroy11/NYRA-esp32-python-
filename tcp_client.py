@@ -1,50 +1,102 @@
+
 import socket
+import time
+
+# ========================================
+# NYRA FOUR ULTRASONIC TCP CLIENT V2
+# ========================================
 
 ESP32_IP = "192.168.8.114"
-ESP32_PORT = 5000
+ESP32_PORT = 3333
 
-print("===== NYRA WIRELESS CHAT =====")
-print("Type your message to NYRA")
-print("Type 'exit' to close\n")
+BUFFER_SIZE = 1024
+CONNECTION_TIMEOUT = 5
+RECONNECT_DELAY = 3
 
-try:
-    client = socket.socket(
-        socket.AF_INET,
-        socket.SOCK_STREAM
-    )
 
-    client.settimeout(10)
-    client.connect((ESP32_IP, ESP32_PORT))
+def start_wireless_monitor():
 
-    print("Connected to NYRA ESP32!\n")
+    print("\n======================================")
+    print("   NYRA FOUR-SIDE ULTRASONIC MONITOR")
+    print("======================================")
+
+    print(f"\n[INFO] ESP32 IP   : {ESP32_IP}")
+    print(f"[INFO] TCP PORT   : {ESP32_PORT}")
+    print("[INFO] CLIENT MODE: TCP")
 
     while True:
 
-        message = input("VS Code: ")
+        try:
 
-        if message.lower() == "exit":
+            print("\n[INFO] Connecting to ESP32-S3...")
+
+            # Create TCP connection
+            with socket.create_connection(
+                (ESP32_IP, ESP32_PORT),
+                timeout=CONNECTION_TIMEOUT
+            ) as client:
+
+                print("\n[CONNECTED] ESP32-S3")
+                print("--------------------------------------")
+                print("[INFO] Receiving four sensor readings...")
+                print("--------------------------------------\n")
+
+                # Wait indefinitely for sensor data
+                client.settimeout(None)
+
+                while True:
+
+                    data = client.recv(BUFFER_SIZE)
+
+                    # Server disconnected
+                    if not data:
+
+                        print("\n[DISCONNECTED] ESP32 connection closed")
+                        break
+
+                    message = data.decode(
+                        "utf-8",
+                        errors="replace"
+                    )
+
+                    print(message, end="", flush=True)
+
+        except socket.timeout:
+
+            print("\n[ERROR] Connection timeout")
+            print("[INFO] Check ESP32 TCP server and network")
+
+        except ConnectionRefusedError:
+
+            print("\n[ERROR] TCP connection refused")
+            print("[INFO] ESP32 server may not be listening")
+
+        except OSError as error:
+
+            print(f"\n[NETWORK ERROR] {error}")
+
+        except KeyboardInterrupt:
+
+            print("\n\n[STOPPED] NYRA wireless monitor stopped")
             break
 
-        client.sendall(
-            (message + "\n").encode("utf-8")
-        )
-
-        response = b""
-
-        while not response.endswith(b"\n"):
-            data = client.recv(1024)
-
-            if not data:
-                break
-
-            response += data
-
         print(
-            "ESP32: ",
-            response.decode("utf-8").strip()
+            f"\n[INFO] Retrying connection in "
+            f"{RECONNECT_DELAY} seconds..."
         )
 
-    client.close()
+        try:
+            time.sleep(RECONNECT_DELAY)
 
-except Exception as error:
-    print("Connection Error:", error)
+        except KeyboardInterrupt:
+            print("\n\n[STOPPED] NYRA wireless monitor stopped")
+            break
+
+
+# ========================================
+# PROGRAM ENTRY POINT
+# ========================================
+
+if __name__ == "__main__":
+
+    start_wireless_monitor()
